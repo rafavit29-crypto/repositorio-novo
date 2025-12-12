@@ -24,7 +24,35 @@ IMPORTANTE:
 `;
 
 let chatSession: Chat | null = null;
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+// Safe API Key retrieval function
+const getApiKey = () => {
+  try {
+    if (typeof process !== 'undefined' && process.env && process.env.API_KEY) {
+      return process.env.API_KEY;
+    }
+    // Fallback para localStorage caso não esteja no process.env (útil para demos)
+    if (typeof localStorage !== 'undefined') {
+      return localStorage.getItem('GEMINI_API_KEY') || '';
+    }
+  } catch (e) {
+    console.warn("Could not retrieve API Key environment", e);
+  }
+  return '';
+};
+
+const apiKey = getApiKey();
+let ai: GoogleGenAI | null = null;
+
+if (apiKey) {
+  try {
+    ai = new GoogleGenAI({ apiKey });
+  } catch (e) {
+    console.error("Failed to initialize Gemini AI", e);
+  }
+} else {
+    console.warn("Gemini API Key missing. AI features will be disabled.");
+}
 
 // Modelo atualizado para versão recomendada para evitar erro 404
 const MODEL_NAME = 'gemini-2.5-flash';
@@ -33,6 +61,8 @@ export const sendMessageToNutri = async (
   message: string,
   history: ChatMessage[]
 ): Promise<string> => {
+  if (!ai) return "⚠️ API Key não configurada. Por favor, verifique as configurações do sistema.";
+  
   try {
     if (!chatSession) {
       chatSession = ai.chats.create({
@@ -56,6 +86,7 @@ export const sendMessageToNutri = async (
 };
 
 export const analyzeFoodImage = async (base64Image: string): Promise<any> => {
+  if (!ai) return null;
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
@@ -76,6 +107,7 @@ export const analyzeFoodImage = async (base64Image: string): Promise<any> => {
 };
 
 export const analyzeWorkoutImage = async (base64Image: string): Promise<any> => {
+  if (!ai) return null;
   try {
     const response = await ai.models.generateContent({
       model: MODEL_NAME,
@@ -95,6 +127,7 @@ export const analyzeWorkoutImage = async (base64Image: string): Promise<any> => 
 };
 
 export const generateHomeWorkout = async (level: string, duration: string, equipment: string): Promise<any> => {
+  if (!ai) return null;
   try {
     const prompt = `
       Crie um treino em casa completo.
