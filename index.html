@@ -1,0 +1,636 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />
+    <title>Calorix - App de Nutrição e Saúde</title>
+    
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Configuração Tailwind -->
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            fontFamily: {
+              sans: ['Inter', 'sans-serif'],
+            },
+            colors: {
+              primary: '#3CB371',
+              'primary-light': '#E8F6EE',
+              'primary-dark': '#2E8B57',
+              background: '#F7F9FB',
+              surface: '#FFFFFF',
+              main: '#1E1E1E',
+              secondary: '#646464',
+            },
+            boxShadow: {
+              'soft': '0 0 6px rgba(0,0,0,0.05)',
+              'hover': '0 4px 12px rgba(0,0,0,0.08)'
+            }
+          }
+        }
+      }
+    </script>
+
+    <!-- Estilos Globais -->
+    <style>
+      body {
+        font-family: 'Inter', sans-serif;
+        background-color: #F7F9FB;
+        color: #1E1E1E;
+        -webkit-tap-highlight-color: transparent;
+      }
+      ::-webkit-scrollbar { width: 6px; height: 6px; }
+      ::-webkit-scrollbar-track { background: transparent; }
+      ::-webkit-scrollbar-thumb { background: #E2E8F0; border-radius: 3px; }
+      ::-webkit-scrollbar-thumb:hover { background: #CBD5E1; }
+      
+      @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+      @keyframes slideUp { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
+      
+      .animate-fade-in { animation: fadeIn 0.4s ease-out forwards; }
+      .animate-slide-up { animation: slideUp 0.4s ease-out forwards; }
+      
+      .card-saas {
+        background: #FFFFFF;
+        border-radius: 12px;
+        box-shadow: 0 0 6px rgba(0,0,0,0.05);
+        border: 1px solid rgba(0,0,0,0.02);
+      }
+      .input-saas {
+        background: #F7F9FB;
+        border: 1px solid #E2E8F0;
+        border-radius: 8px;
+        transition: all 0.2s ease;
+      }
+      .input-saas:focus {
+        background: #FFFFFF;
+        border-color: #3CB371;
+        box-shadow: 0 0 0 3px rgba(60, 179, 113, 0.1);
+        outline: none;
+      }
+      .safe-pb { padding-bottom: env(safe-area-inset-bottom); }
+      .no-scrollbar::-webkit-scrollbar { display: none; }
+      .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    </style>
+
+    <!-- Import Map para Módulos ES -->
+    <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@18.2.0",
+    "react-dom/client": "https://esm.sh/react-dom@18.2.0/client",
+    "lucide-react": "https://esm.sh/lucide-react@0.263.1",
+    "recharts": "https://esm.sh/recharts@2.12.0",
+    "@google/genai": "https://esm.sh/@google/genai@0.1.1",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/"
+  }
+}
+</script>
+    
+    <!-- Babel para compilar JSX/TSX no navegador -->
+    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<link rel="stylesheet" href="/index.css">
+</head>
+<body>
+    <div id="root"></div>
+
+    <!-- Script Principal da Aplicação -->
+    <script type="text/babel" data-type="module" data-presets="typescript,react">
+      import React, { useState, useEffect, useRef } from 'react';
+      import ReactDOM from 'react-dom/client';
+      import { 
+        LayoutDashboard, Target, Utensils, Dumbbell, PlayCircle, 
+        MessageCircleHeart, Clock, Menu, Bell, Moon, Grid, User, LogOut, X, 
+        Users, Trophy, Calendar, Link, Plus, Edit2, Trash2, ChevronRight, 
+        Coffee, Sun, Cookie, Droplets, Zap, MessageCircle, ArrowRight, Scale, 
+        Sparkles, Search, Camera, ScanLine, Image as ImageIcon, Check, Leaf, 
+        AlertCircle, Flame, Footprints, CheckCircle2, Circle, Upload, Film, 
+        MessageSquare, Send, Heart, Share2, Award, Video, MoreHorizontal, 
+        Bookmark, Flag, UserPlus, UserCheck, Compass, Shield, Layers, Filter, 
+        Hash, Activity, Ruler, ChevronLeft, ChevronUp, ChevronDown, Save, 
+        Loader2, Home, Pill, Milk, HeartPulse, Banana, RefreshCw, Smartphone, 
+        Watch, MapPin, Info
+      } from 'lucide-react';
+      import { 
+        PieChart, Pie, Cell, ResponsiveContainer, Tooltip as RechartsTooltip, 
+        Legend, BarChart, Bar, XAxis, YAxis, ReferenceLine 
+      } from 'recharts';
+      import { GoogleGenAI } from "@google/genai";
+
+      // ----------------------------------------------------------------------
+      // MOCK PROCESS.ENV PARA API KEY
+      // ----------------------------------------------------------------------
+      // Tenta pegar do localStorage ou usa uma string vazia.
+      // O usuário deve configurar sua chave no console ou via UI se implementado.
+      const API_KEY = localStorage.getItem('GEMINI_API_KEY') || ''; 
+      const process = { env: { API_KEY: API_KEY } };
+
+      // Se não tiver chave, loga um aviso
+      if (!API_KEY) {
+        console.warn("⚠️ API Key do Gemini não encontrada. Configure localStorage.setItem('GEMINI_API_KEY', 'sua-chave')");
+      }
+
+      // ----------------------------------------------------------------------
+      // TYPES (Adaptados para JS/TS em runtime)
+      // ----------------------------------------------------------------------
+      // Interfaces são removidas pelo Babel, mantendo apenas para estruturar o código mentalmente
+      
+      const Tab = {
+        DASHBOARD: 'Dashboard',
+        META: 'Meta',
+        ALIMENTACAO: 'Alimentação',
+        TREINOS: 'Treinos',
+        CALORIX: 'Calorix',
+        NUTRIONLINE: 'NutriOnline',
+        JEJUM: 'Jejum',
+        COMUNIDADE: 'Comunidade',
+        PERFIL: 'Perfil',
+        LOJA: 'Loja',
+        ONBOARDING: 'Onboarding',
+        RANKING: 'Conquistas',
+        CALENDARIO: 'Calendário',
+        INTEGRACOES: 'Integrações'
+      };
+
+      // ----------------------------------------------------------------------
+      // DATA & UTILS
+      // ----------------------------------------------------------------------
+
+      const brazilianFoodDatabase = [
+        { name: 'Arroz Branco Cozido', portion: '100g', calories: 128, protein: 2.5, carbs: 28, fat: 0.2, micronutrients: { vitaminC: 0, iron: 0.2, calcium: 10, potassium: 35, magnesium: 12 } },
+        { name: 'Feijão Carioca Cozido', portion: '100g', calories: 76, protein: 4.8, carbs: 13.6, fat: 0.5, micronutrients: { vitaminC: 0, iron: 1.5, calcium: 27, potassium: 250, magnesium: 40 } },
+        { name: 'Peito de Frango Grelhado', portion: '100g', calories: 165, protein: 31, carbs: 0, fat: 3.6, micronutrients: { vitaminC: 0, iron: 1, calcium: 15, potassium: 256, magnesium: 29 } },
+        { name: 'Ovo Cozido', portion: '1 unidade', calories: 70, protein: 6, carbs: 0.5, fat: 5, micronutrients: { vitaminC: 0, iron: 0.6, calcium: 25, potassium: 60, magnesium: 6 } },
+        { name: 'Pão Francês', portion: '1 unidade (50g)', calories: 135, protein: 4, carbs: 28, fat: 0, micronutrients: { vitaminC: 0, iron: 1.5, calcium: 10, potassium: 50, magnesium: 10 } },
+        { name: 'Banana Prata', portion: '1 unidade', calories: 60, protein: 1, carbs: 15, fat: 0, micronutrients: { vitaminC: 8, iron: 0.3, calcium: 5, potassium: 358, magnesium: 27 } },
+        { name: 'Maçã', portion: '1 unidade', calories: 52, protein: 0.3, carbs: 14, fat: 0.2, micronutrients: { vitaminC: 4.6, iron: 0.1, calcium: 6, potassium: 107, magnesium: 5 } },
+        { name: 'Café com Leite (Sem açúcar)', portion: '200ml', calories: 60, protein: 3, carbs: 5, fat: 3, micronutrients: { vitaminC: 0, iron: 0, calcium: 100, potassium: 130, magnesium: 10 } },
+        { name: 'Tapioca (Goma)', portion: '100g', calories: 336, protein: 0, carbs: 83, fat: 0, micronutrients: { vitaminC: 0, iron: 0, calcium: 0, potassium: 0, magnesium: 0 } },
+        { name: 'Cuscuz de Milho', portion: '100g', calories: 112, protein: 3.8, carbs: 23, fat: 0.7, micronutrients: { vitaminC: 0, iron: 0.6, calcium: 2, potassium: 80, magnesium: 30 } },
+      ];
+
+      const calculateBMR = (weight, height, age, gender) => {
+        if (gender === 'male') {
+          return (10 * weight) + (6.25 * height) - (5 * age) + 5;
+        } else {
+          return (10 * weight) + (6.25 * height) - (5 * age) - 161;
+        }
+      };
+
+      const calculateTDEE = (bmr, activity) => {
+        const multipliers = { sedentary: 1.2, light: 1.375, moderate: 1.55, active: 1.725, very_active: 1.9 };
+        return Math.round(bmr * (multipliers[activity] || 1.2));
+      };
+
+      const calculateWaterGoal = (weight, sports) => {
+        let water = weight * 35; 
+        if (sports) water += 500;
+        return Math.round(water);
+      };
+
+      const generateGoal = (weight, height, age, gender, activity, sports, goalType, targetWeight, deadline) => {
+        const bmr = calculateBMR(weight, height, age, gender);
+        const tdee = calculateTDEE(bmr, activity);
+        let dailyCalories = tdee;
+        let proteinRatio = 0.3; let carbsRatio = 0.4; let fatRatio = 0.3;
+
+        switch (goalType) {
+          case 'lose_weight': case 'reduce_measurements':
+            dailyCalories = tdee - 500; proteinRatio = 0.35; carbsRatio = 0.35; fatRatio = 0.30; break;
+          case 'define': case 'condition':
+            dailyCalories = tdee - 250; proteinRatio = 0.40; carbsRatio = 0.35; fatRatio = 0.25; break;
+          case 'gain_muscle':
+            dailyCalories = tdee + 300; proteinRatio = 0.30; carbsRatio = 0.50; fatRatio = 0.20; break;
+          case 'maintain': case 'healthy_lifestyle':
+            dailyCalories = tdee; proteinRatio = 0.30; carbsRatio = 0.40; fatRatio = 0.30; break;
+        }
+
+        if (dailyCalories < 1200) dailyCalories = 1200;
+
+        return {
+          currentWeight: weight,
+          targetWeight: targetWeight || weight,
+          days: deadline || 60,
+          type: goalType,
+          startDate: new Date().toISOString(),
+          dailyCalories: Math.round(dailyCalories),
+          dailyWater: calculateWaterGoal(weight, sports),
+          macros: {
+            protein: Math.round((dailyCalories * proteinRatio) / 4),
+            carbs: Math.round((dailyCalories * carbsRatio) / 4),
+            fat: Math.round((dailyCalories * fatRatio) / 9),
+          }
+        };
+      };
+
+      // ----------------------------------------------------------------------
+      // GEMINI SERVICE
+      // ----------------------------------------------------------------------
+      
+      const SYSTEM_INSTRUCTION = `
+      Você é uma inteligência artificial especialista em Nutrição Esportiva e Clínica...
+      `;
+
+      let chatSession = null;
+      let ai = null;
+      
+      try {
+        if(process.env.API_KEY) {
+          ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+        }
+      } catch(e) { console.error("Erro init Gemini", e); }
+
+      const MODEL_NAME = 'gemini-2.5-flash';
+
+      const sendMessageToNutri = async (message, history) => {
+        if(!ai) return "Por favor, configure sua API Key do Gemini no localStorage (GEMINI_API_KEY).";
+        try {
+          if (!chatSession) {
+            chatSession = ai.chats.create({
+              model: MODEL_NAME,
+              config: { systemInstruction: SYSTEM_INSTRUCTION },
+              history: history.map(h => ({ role: h.role, parts: [{ text: h.text }] }))
+            });
+          }
+          const response = await chatSession.sendMessage({ message });
+          return response.text || "Desculpe, tente novamente.";
+        } catch (error) {
+          console.error("Erro na NutriOnline:", error);
+          return "Erro ao consultar a IA. Verifique sua chave ou conexão.";
+        }
+      };
+
+      const analyzeFoodImage = async (base64Image) => {
+        if(!ai) return null;
+        try {
+          const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: {
+              parts: [
+                { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+                { text: "Identifique o alimento... Retorne JSON: {name, calories, protein, carbs, fat, micronutrients: {vitaminC, iron...}}. Se não for comida, erro." }
+              ]
+            },
+            config: { responseMimeType: 'application/json' }
+          });
+          return JSON.parse(response.text || '{}');
+        } catch (error) {
+          console.error("Erro ao analisar imagem:", error);
+          return null;
+        }
+      };
+
+      const analyzeWorkoutImage = async (base64Image) => {
+        if(!ai) return null;
+        try {
+          const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: {
+              parts: [
+                { inlineData: { mimeType: 'image/jpeg', data: base64Image } },
+                { text: "Leia esta ficha de treino. JSON: {exercises: [{ name, sets, reps }]}." }
+              ]
+            },
+            config: { responseMimeType: 'application/json' }
+          });
+          return JSON.parse(response.text || '{}');
+        } catch (error) { return null; }
+      };
+
+      const generateHomeWorkout = async (level, duration, equipment) => {
+        if(!ai) return null;
+        try {
+          const prompt = `Crie treino em casa. Nível: ${level}, Duração: ${duration}, Equip: ${equipment}. JSON: {exercises: [{name, sets, reps}]}`;
+          const response = await ai.models.generateContent({
+            model: MODEL_NAME,
+            contents: { parts: [{ text: prompt }] },
+            config: { responseMimeType: 'application/json' }
+          });
+          return JSON.parse(response.text || '{}');
+        } catch (error) { return null; }
+      };
+
+      // ----------------------------------------------------------------------
+      // COMPONENTES UI (Helpers)
+      // ----------------------------------------------------------------------
+
+      const ToastSystem = ({ toasts, removeToast }) => (
+        <div className="fixed top-4 left-0 right-0 z-[100] flex flex-col items-center gap-2 pointer-events-none px-4">
+          {toasts.map((toast) => (
+            <div key={toast.id} className="pointer-events-auto bg-white/95 backdrop-blur-md shadow-lg shadow-gray-200 border border-gray-100 p-4 rounded-2xl flex items-center gap-3 animate-slide-up w-full max-w-sm">
+              <div className={`p-2 rounded-full ${toast.type === 'success' ? 'bg-green-100 text-green-600' : toast.type === 'warning' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'}`}>
+                {toast.type === 'success' ? <CheckCircle2 size={18} /> : toast.type === 'warning' ? <AlertCircle size={18} /> : <Info size={18} />}
+              </div>
+              <p className="flex-1 text-sm font-medium text-gray-700 leading-tight">{toast.message}</p>
+              <button onClick={() => removeToast(toast.id)} className="text-gray-400 hover:text-gray-600"><X size={16} /></button>
+            </div>
+          ))}
+        </div>
+      );
+
+      const CalorieRing = ({ consumed, target }) => {
+        const radius = 80; const stroke = 10;
+        const normalizedRadius = radius - stroke * 2;
+        const circumference = normalizedRadius * 2 * Math.PI;
+        const percent = Math.min((consumed / target) * 100, 100);
+        const strokeDashoffset = circumference - (percent / 100) * circumference;
+        const remaining = Math.max(0, target - consumed);
+        return (
+          <div className="relative flex items-center justify-center">
+            <svg height={radius * 2} width={radius * 2} className="transform -rotate-90">
+              <circle stroke="#F3F4F6" strokeWidth={stroke} fill="transparent" r={normalizedRadius} cx={radius} cy={radius} />
+              <circle stroke="#3CB371" strokeWidth={stroke} strokeDasharray={circumference + ' ' + circumference} style={{ strokeDashoffset, transition: 'stroke-dashoffset 0.6s' }} strokeLinecap="round" fill="transparent" r={normalizedRadius} cx={radius} cy={radius} />
+            </svg>
+            <div className="absolute flex flex-col items-center">
+              <Flame size={24} className="text-primary mb-1" strokeWidth={2} />
+              <span className="text-3xl font-bold text-main">{remaining}</span>
+              <span className="text-xs text-secondary font-medium uppercase tracking-wide">Restantes</span>
+            </div>
+          </div>
+        );
+      };
+
+      const MacroBar = ({ label, current, max, colorClass }) => {
+        const percent = Math.min((current / max) * 100, 100);
+        return (
+          <div className="space-y-2">
+            <div className="flex justify-between text-sm">
+              <span className="font-medium text-secondary">{label}</span>
+              <span className="font-semibold text-main">{current} <span className="text-gray-400 font-normal">/ {max}g</span></span>
+            </div>
+            <div className="h-2 w-full bg-gray-100 rounded-full overflow-hidden">
+              <div className={`h-full rounded-full transition-all duration-500 ${colorClass}`} style={{ width: `${percent}%` }}></div>
+            </div>
+          </div>
+        );
+      };
+
+      const MacroDisplay = ({ consumed, target }) => (
+        <div className="space-y-6 w-full">
+          <MacroBar label="Proteínas" current={consumed.protein} max={target.protein} colorClass="bg-emerald-500" />
+          <MacroBar label="Carboidratos" current={consumed.carbs} max={target.carbs} colorClass="bg-blue-400" />
+          <MacroBar label="Gorduras" current={consumed.fat} max={target.fat} colorClass="bg-amber-400" />
+        </div>
+      );
+
+      const DailyGoalChart = ({ consumed, target }) => {
+        const data = [{ name: 'Hoje', consumido: consumed, meta: target }];
+        const isOver = consumed > target;
+        return (
+          <div className="w-full h-48 flex flex-col">
+            <div className="flex justify-between items-end mb-2 px-2">
+              <span className="text-xs font-bold text-gray-400 uppercase">Progresso</span>
+              <span className="text-sm font-bold text-primary">{Math.max(0, target - consumed)} <span className="text-[10px] text-gray-400">kcal restantes</span></span>
+            </div>
+            <div className="flex-1 w-full bg-gray-50 rounded-2xl p-2 border border-gray-100 relative min-w-0">
+               <div className="absolute top-1/2 left-4 right-4 -translate-y-1/2 h-8 bg-gray-200 rounded-full overflow-hidden">
+                  <div className="absolute right-0 top-0 bottom-0 w-1 bg-gray-300 z-10"></div>
+                  <div className={`h-full rounded-full transition-all duration-1000 ${isOver ? 'bg-red-400' : 'bg-primary'}`} style={{ width: `${Math.min((consumed / target) * 100, 100)}%` }}></div>
+               </div>
+            </div>
+          </div>
+        );
+      };
+
+      // ----------------------------------------------------------------------
+      // COMPONENTES PRINCIPAIS
+      // ----------------------------------------------------------------------
+
+      // Meal Card (Fixed Responsiveness)
+      const MealCard = ({ title, items, icon, onAddClick, onEditClick, onRemove }) => {
+        const totalCalories = items.reduce((acc, item) => acc + item.calories, 0);
+        return (
+          <div className="card-saas p-4 sm:p-5 hover:shadow-hover transition-shadow duration-200 h-full flex flex-col">
+            <div className="flex justify-between items-center mb-4 pb-3 border-b border-gray-50">
+              <div className="flex items-center gap-3">
+                <div className="text-secondary bg-gray-50 p-2 rounded-lg">{icon}</div>
+                <div><h3 className="font-bold text-main text-sm">{title}</h3><span className="text-xs text-gray-400 font-medium">{totalCalories} kcal</span></div>
+              </div>
+              <button onClick={onAddClick} className="w-8 h-8 flex items-center justify-center rounded-lg text-primary hover:bg-primary-light"><Plus size={18} strokeWidth={2.5} /></button>
+            </div>
+            <div className="flex-1 flex flex-col gap-2 overflow-y-auto max-h-[300px] custom-scrollbar pr-1">
+              {items.length === 0 ? (
+                <div className="flex-1 flex flex-col items-center justify-center py-6 text-gray-300 gap-2 min-h-[100px]"><div className="w-10 h-10 rounded-full bg-gray-50 flex items-center justify-center"><Plus size={20} className="opacity-50" /></div><span className="text-xs">Sem registros</span></div>
+              ) : (
+                items.map((item) => (
+                  <div key={item.id} className="flex justify-between items-center text-sm group relative p-2 hover:bg-gray-50 rounded-xl transition-colors border border-transparent hover:border-gray-100">
+                    <div className="min-w-0 pr-3 flex-1">
+                      <p className="text-main truncate font-semibold text-xs sm:text-sm">{item.name}</p>
+                      <div className="flex flex-wrap items-center gap-1 mt-0.5"><p className="text-[10px] text-gray-400">{item.portion}</p></div>
+                    </div>
+                    <div className="flex items-center gap-2 sm:gap-3">
+                       <span className="font-bold text-gray-700 whitespace-nowrap text-xs bg-gray-100 px-2 py-1 rounded-md min-w-[2.5rem] text-center">{item.calories}</span>
+                       <div className="flex items-center gap-1 opacity-100 lg:opacity-0 lg:group-hover:opacity-100 transition-opacity">
+                          {onEditClick && <button onClick={() => onEditClick(item)} className="p-1.5 text-gray-400 hover:text-primary"><Edit2 size={14} /></button>}
+                          {onRemove && <button onClick={() => onRemove(item.id)} className="p-1.5 text-gray-400 hover:text-red-500"><Trash2 size={14} /></button>}
+                       </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        );
+      };
+
+      // Layout (Fixed Mobile Icons)
+      const Layout = ({ children, activeTab, setActiveTab, currentFastingMode, notifications = [], user }) => {
+        const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+        const [showNotifications, setShowNotifications] = useState(false);
+        const unreadCount = notifications.filter(n => !n.read).length;
+
+        const navItems = [
+          { id: Tab.DASHBOARD, icon: LayoutDashboard, label: 'Dashboard' },
+          { id: Tab.CALENDARIO, icon: Calendar, label: 'Calendário' },
+          { id: Tab.META, icon: Target, label: 'Metas' },
+          { id: Tab.ALIMENTACAO, icon: Utensils, label: 'Alimentação' },
+          { id: Tab.TREINOS, icon: Dumbbell, label: 'Treinos' },
+          { id: Tab.JEJUM, icon: Clock, label: 'Jejum' },
+          { id: Tab.RANKING, icon: Trophy, label: 'Conquistas' },
+          { id: Tab.CALORIX, icon: PlayCircle, label: 'Aulas' },
+          { id: Tab.COMUNIDADE, icon: Users, label: 'Comunidade' },
+          { id: Tab.INTEGRACOES, icon: Link, label: 'Integrações' },
+          { id: Tab.PERFIL, icon: User, label: 'Meu Perfil' },
+          { id: Tab.NUTRIONLINE, icon: MessageCircleHeart, label: 'Nutri IA' },
+        ];
+        
+        const bottomNavItems = [
+          { id: Tab.DASHBOARD, icon: LayoutDashboard, label: 'Home' },
+          { id: Tab.ALIMENTACAO, icon: Utensils, label: 'Diário' },
+          { id: Tab.NUTRIONLINE, icon: MessageCircleHeart, label: 'Nutri IA' },
+          { id: Tab.TREINOS, icon: Dumbbell, label: 'Treino' },
+          { id: 'MENU', icon: Menu, label: 'Menu' },
+        ];
+
+        return (
+          <div className="min-h-screen bg-background text-main font-sans flex flex-col lg:flex-row">
+            {isSidebarOpen && <div className="fixed inset-0 bg-black/40 z-[60] lg:hidden backdrop-blur-sm" onClick={() => setIsSidebarOpen(false)}></div>}
+            
+            <aside className={`fixed inset-y-0 left-0 z-[70] w-72 bg-surface border-r border-gray-100 transform transition-transform duration-300 ease-in-out shadow-2xl lg:shadow-none ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'} lg:static lg:h-screen lg:flex-shrink-0`}>
+               <div className="h-full flex flex-col">
+                  <div className="h-20 flex items-center px-8 border-b border-gray-50 bg-surface">
+                     <span className="text-xl font-bold text-primary tracking-tight">Calorix</span>
+                     <button className="ml-auto lg:hidden text-secondary p-2" onClick={() => setIsSidebarOpen(false)}><X size={24} /></button>
+                  </div>
+                  <nav className="flex-1 overflow-y-auto py-6 px-4 space-y-1 custom-scrollbar">
+                     {navItems.map(item => {
+                        const Icon = item.icon;
+                        const isActive = activeTab === item.id;
+                        return (
+                           <button key={item.id} onClick={() => { setActiveTab(item.id); setIsSidebarOpen(false); }} className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${isActive ? 'bg-primary-light text-primary font-semibold' : 'text-secondary hover:bg-gray-50'}`}>
+                              <Icon size={20} className={isActive ? 'text-primary' : 'text-gray-400'} strokeWidth={isActive ? 2 : 1.5} />
+                              <span>{item.label}</span>
+                           </button>
+                        );
+                     })}
+                  </nav>
+               </div>
+            </aside>
+
+            <div className="flex-1 flex flex-col h-screen overflow-hidden bg-[#F7F9FB]">
+               <header className="h-16 lg:h-20 bg-surface/80 backdrop-blur-md border-b border-gray-100 flex items-center justify-between px-4 lg:px-10 flex-shrink-0 sticky top-0 z-40">
+                  <h2 className="text-lg font-bold text-main tracking-tight">{activeTab}</h2>
+                  <div className="flex items-center gap-3">
+                     <button onClick={() => setShowNotifications(!showNotifications)} className="relative p-2"><Bell size={20} /></button>
+                     <div className="w-9 h-9 rounded-full bg-primary-light text-primary flex items-center justify-center font-bold text-sm border-2 border-white shadow-sm">
+                        {user && user.avatar ? <img src={user.avatar} className="w-full h-full object-cover rounded-full"/> : 'M'}
+                     </div>
+                  </div>
+               </header>
+               <main className="flex-1 overflow-y-auto p-4 lg:p-10 scroll-smooth custom-scrollbar pb-32 lg:pb-10 relative z-0">
+                  <div className="max-w-6xl mx-auto animate-fade-in">{children}</div>
+               </main>
+            </div>
+
+            <div className="fixed bottom-0 left-0 right-0 bg-white/95 backdrop-blur-xl border-t border-gray-100/50 lg:hidden z-50 flex items-center justify-around px-2 safe-pb h-[calc(60px+env(safe-area-inset-bottom))] shadow-[0_-4px_30px_rgba(0,0,0,0.04)]">
+               {bottomNavItems.map(item => {
+                  const isActive = activeTab === item.id;
+                  const isMenu = item.id === 'MENU';
+                  return (
+                     <button key={item.id} onClick={() => isMenu ? setIsSidebarOpen(true) : setActiveTab(item.id)} className="flex flex-col items-center justify-center w-full h-full gap-1 pt-2 pb-1">
+                        <div className={`p-1 rounded-full transition-all ${isActive && !isMenu ? 'text-primary transform -translate-y-1' : 'text-gray-400'}`}>
+                           <item.icon size={24} strokeWidth={isActive ? 2.5 : 2} fill={isActive && !isMenu ? "currentColor" : "none"} />
+                        </div>
+                        <span className={`text-[10px] font-bold ${isActive && !isMenu ? 'text-primary' : 'text-gray-400'}`}>{item.label}</span>
+                     </button>
+                  );
+               })}
+            </div>
+          </div>
+        );
+      };
+
+      // ----------------------------------------------------------------------
+      // PLACEHOLDERS PARA OUTROS COMPONENTES (Para o arquivo não ficar gigante)
+      // Em um cenário real, cada um seria um arquivo. Aqui, simplifiquei.
+      // ----------------------------------------------------------------------
+
+      const Dashboard = ({ state, setActiveTab, addFood, editFood, removeFood }) => {
+        const today = new Date().toISOString().split('T')[0];
+        const logs = state.foodLog.filter(f => f.date === today);
+        const consumed = logs.reduce((a, b) => a + b.calories, 0);
+        const target = state.goal?.dailyCalories || 2000;
+        
+        return (
+           <div className="space-y-6 md:space-y-8 pb-4">
+              <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                 <div className="lg:col-span-2 card-saas p-5 md:p-8 space-y-6 md:space-y-8">
+                    <div className="flex flex-col sm:flex-row items-center justify-between gap-6">
+                       <CalorieRing consumed={consumed} target={target} />
+                       <div className="flex-1 w-full"><MacroDisplay consumed={{protein: 0, carbs: 0, fat: 0}} target={{protein: 100, carbs: 100, fat: 50}} /></div>
+                    </div>
+                    <DailyGoalChart consumed={consumed} target={target} />
+                 </div>
+              </div>
+              <div className="space-y-4">
+                 <h2 className="text-lg font-bold text-main">Refeições de Hoje</h2>
+                 <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+                    <MealCard title="Café" items={logs.filter(i => i.mealType === 'cafe')} icon={<Coffee size={18} />} onAddClick={() => alert("Função completa no App.tsx")} onRemove={removeFood} />
+                    <MealCard title="Almoço" items={logs.filter(i => i.mealType === 'almoco')} icon={<Sun size={18} />} onAddClick={() => {}} />
+                    <MealCard title="Jantar" items={logs.filter(i => i.mealType === 'jantar')} icon={<Moon size={18} />} onAddClick={() => {}} />
+                    <MealCard title="Lanche" items={logs.filter(i => i.mealType === 'lanche')} icon={<Cookie size={18} />} onAddClick={() => {}} />
+                 </div>
+              </div>
+           </div>
+        );
+      };
+
+      const Onboarding = ({ finish }) => (
+         <div className="fixed inset-0 bg-[#F7F9FB] z-[100] flex flex-col items-center justify-center p-4">
+            <div className="bg-white w-full max-w-2xl rounded-[20px] shadow-soft border border-gray-100 p-10 flex flex-col items-center text-center">
+               <h1 className="text-2xl font-bold mb-4">Bem-vindo ao Calorix</h1>
+               <p className="text-gray-500 mb-8">Vamos configurar seu perfil.</p>
+               <button onClick={() => finish({ name: 'Usuário', weight: 60, height: 165, age: 25, gender: 'female', activityLevel: 'moderate', goalType: 'lose_weight' })} className="bg-primary text-white px-8 py-3 rounded-xl font-bold">Começar (Demo)</button>
+            </div>
+         </div>
+      );
+
+      // ----------------------------------------------------------------------
+      // APP MAIN
+      // ----------------------------------------------------------------------
+
+      const App = () => {
+        const [activeTab, setActiveTab] = useState(Tab.DASHBOARD);
+        const [toasts, setToasts] = useState([]);
+        const [state, setState] = useState(() => {
+           const saved = localStorage.getItem('calorix_state');
+           return saved ? JSON.parse(saved) : {
+             user: { name: '', onboardingCompleted: false },
+             goal: null,
+             foodLog: [],
+             workoutPlan: [],
+             dailyStats: {},
+             fasting: { isActive: false, mode: 'rabbit' },
+             communityPosts: [],
+             notifications: [],
+             integrations: {}
+           };
+        });
+
+        useEffect(() => { localStorage.setItem('calorix_state', JSON.stringify(state)); }, [state]);
+
+        const showToast = (message, type = 'success') => {
+           const id = Date.now().toString();
+           setToasts(p => [...p, { id, message, type }]);
+           setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4000);
+        };
+
+        if (!state.user.onboardingCompleted) {
+           return <Onboarding finish={(userData) => {
+              const goal = generateGoal(userData.weight, userData.height, userData.age, userData.gender, userData.activityLevel, false, userData.goalType);
+              setState(p => ({ ...p, user: { ...p.user, ...userData, onboardingCompleted: true }, goal }));
+           }} />;
+        }
+
+        return (
+           <Layout activeTab={activeTab} setActiveTab={setActiveTab} user={state.user} notifications={state.notifications}>
+              <ToastSystem toasts={toasts} removeToast={id => setToasts(p => p.filter(t => t.id !== id))} />
+              {activeTab === Tab.DASHBOARD && <Dashboard state={state} setActiveTab={setActiveTab} removeFood={id => setState(p => ({...p, foodLog: p.foodLog.filter(f => f.id !== id)}))} />}
+              {activeTab === Tab.NUTRIONLINE && (
+                 <div className="flex flex-col h-[calc(100vh-140px)]">
+                    <div className="flex-1 bg-white rounded-2xl p-4 mb-4 shadow-sm border border-gray-100 flex items-center justify-center text-gray-400">
+                       Chat com IA (Gemini 2.5) ativo. Configure a API Key no código.
+                    </div>
+                 </div>
+              )}
+              {/* Outras abas simplificadas para o arquivo único */}
+              {activeTab !== Tab.DASHBOARD && activeTab !== Tab.NUTRIONLINE && (
+                 <div className="flex items-center justify-center h-64 text-gray-400">Conteúdo da aba {activeTab}</div>
+              )}
+           </Layout>
+        );
+      };
+
+      const root = ReactDOM.createRoot(document.getElementById('root'));
+      root.render(<App />);
+    </script>
+<script type="module" src="/index.tsx"></script>
+</body>
+</html>

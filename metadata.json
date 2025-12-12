@@ -1,0 +1,13 @@
+{
+  "name": "Calorix",
+  "description": "Aplicativo de emagrecimento feminino focado em saúde, metas definitivas e acompanhamento com IA Nutricionista.",
+  "requestFramePermissions": [
+    "camera"
+  ],
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/"
+    }
+  ]
+}
